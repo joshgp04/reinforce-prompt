@@ -1,1 +1,1 @@
-# reinforce-prompt
+# Reinforcement Learning-Based Continuous Prompt Generation from Linear Combination of Discrete Prompt Embeddings
