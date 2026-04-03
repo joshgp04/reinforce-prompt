@@ -1,0 +1,9 @@
+torch>=2.1.0
+transformers>=4.37.0
+datasets>=2.16.0
+accelerate>=0.25.0
+bitsandbytes>=0.42.0
+numpy
+tqdm
+matplotlib
+tensorboard
