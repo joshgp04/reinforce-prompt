@@ -78,7 +78,7 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
             # Generate answers with the sampled linear combination of prompts
             with torch.no_grad():
                 predictions = model.generate(
-                    encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=512
+                    encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=256
                 )
 
             # Binary correctness reward: r(x) = 1 if correct, 0 otherwise
