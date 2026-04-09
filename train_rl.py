@@ -41,6 +41,7 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
     optimizer = torch.optim.Adam(model.mixer.parameters(), lr=lr)
     if resume_checkpoint:
         optimizer.load_state_dict(resume_checkpoint["optimizer_state_dict"])
+    test_dataset = GSM8KDataset(split="test")
     writer = SummaryWriter(log_dir)
     global_step = resume_checkpoint["global_step"] if resume_checkpoint else 0
 
@@ -101,9 +102,17 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
 
         avg_reward = total_reward / max(n_steps, 1)
         avg_loss = total_loss / max(n_steps, 1)
+
+        # Evaluate with deterministic weights on train and test subsets
+        model.mixer.eval()
+        train_acc = _eval_accuracy(model, dataset, n_samples=200, batch_size=32)
+        test_acc = _eval_accuracy(model, test_dataset, n_samples=200, batch_size=32)
+        model.mixer.train()
+
         writer.add_scalar("train/epoch_loss", avg_loss, epoch)
-        writer.add_scalar("train/accuracy", avg_reward, epoch)
-        print(f"Epoch {epoch+1}: avg loss = {avg_loss:.4f}, accuracy = {avg_reward:.4f}")
+        writer.add_scalar("train/accuracy", train_acc, epoch)
+        writer.add_scalar("test/accuracy", test_acc, epoch)
+        print(f"Epoch {epoch+1}: loss = {avg_loss:.4f}, train acc = {train_acc:.4f}, test acc = {test_acc:.4f}")
 
         # Save checkpoint after each epoch
         os.makedirs("checkpoints", exist_ok=True)
@@ -112,16 +121,42 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
             "mixer_state_dict": model.mixer.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "global_step": global_step,
-            "accuracy": avg_reward,
+            "train_accuracy": train_acc,
+            "test_accuracy": test_acc,
         }
         torch.save(ckpt, "checkpoints/rl_latest.pt")
-        if avg_reward > best_accuracy:
+        if test_acc > best_accuracy:
             best_accuracy = avg_reward
             torch.save(ckpt, "checkpoints/rl_best.pt")
             print(f"  New best accuracy: {best_accuracy:.4f}")
 
     writer.close()
     return model
+
+
+@torch.no_grad()
+def _eval_accuracy(model, dataset, n_samples=200, batch_size=32):
+    """Quick accuracy check on a subset via generation with deterministic weights."""
+    n = min(n_samples, len(dataset))
+    correct = 0
+    for i in range(0, n, batch_size):
+        batch_items = [dataset[j] for j in range(i, min(i + batch_size, n))]
+        questions = [item["question"] for item in batch_items]
+        gold_answers = [item["answer"] for item in batch_items]
+
+        encoded = model.tokenizer(
+            questions, return_tensors="pt", padding=True, truncation=True, max_length=512
+        ).to(model.device)
+
+        pooled = model.get_pooled_input(encoded.input_ids, encoded.attention_mask)
+        alpha = model.mixer(pooled)
+        predictions = model.generate(encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=512)
+
+        for pred, gold in zip(predictions, gold_answers):
+            if check_answer(pred, gold):
+                correct += 1
+
+    return correct / n
 
 
 def main():

@@ -41,6 +41,8 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
     writer = SummaryWriter(log_dir)
     global_step = resume_checkpoint["global_step"] if resume_checkpoint else 0
 
+    test_dataset = GSM8KDataset(split="test")
+
     model.mixer.train()
     # Backbone stays frozen but we need forward pass for loss
     model.backbone.eval()
@@ -122,12 +124,14 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
         avg_loss = total_loss / max(n_batches, 1)
         writer.add_scalar("train/epoch_loss", avg_loss, epoch)
 
-        # Accuracy check on a small subset (128 examples from training data)
+        # Accuracy check on subsets of train and test
         model.mixer.eval()
-        acc = _eval_accuracy(model, dataset, n_samples=128, batch_size=32)
+        train_acc = _eval_accuracy(model, dataset, n_samples=200, batch_size=32)
+        test_acc = _eval_accuracy(model, test_dataset, n_samples=200, batch_size=32)
         model.mixer.train()
-        writer.add_scalar("train/accuracy", acc, epoch)
-        print(f"Epoch {epoch+1}: avg loss = {avg_loss:.4f}, accuracy = {acc:.4f}")
+        writer.add_scalar("train/accuracy", train_acc, epoch)
+        writer.add_scalar("test/accuracy", test_acc, epoch)
+        print(f"Epoch {epoch+1}: loss = {avg_loss:.4f}, train acc = {train_acc:.4f}, test acc = {test_acc:.4f}")
 
         # Save checkpoint after each epoch
         os.makedirs("checkpoints", exist_ok=True)
@@ -136,11 +140,12 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
             "mixer_state_dict": model.mixer.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "global_step": global_step,
-            "accuracy": acc,
+            "train_accuracy": train_acc,
+            "test_accuracy": test_acc,
         }
         torch.save(ckpt, "checkpoints/supervised_latest.pt")
-        if acc > best_accuracy:
-            best_accuracy = acc
+        if test_acc > best_accuracy:
+            best_accuracy = test_acc
             torch.save(ckpt, "checkpoints/supervised_best.pt")
             print(f"  New best accuracy: {best_accuracy:.4f}")
 

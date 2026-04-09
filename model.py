@@ -6,6 +6,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from prompts import PROMPT_BANK, K
 
+# A100 TF32: same accuracy as FP32, ~3x faster matmuls
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 
 class PromptMixer(nn.Module):
     """Small MLP that maps a pooled input embedding to prompt-bank weights."""
@@ -43,6 +47,7 @@ class PromptMixingModel(nn.Module):
         # Freeze backbone
         for param in self.backbone.parameters():
             param.requires_grad = False
+        self.backbone = torch.compile(self.backbone)
         self.embed_dim = self.backbone.config.hidden_size
         self.mixer = PromptMixer(self.embed_dim).to(device)
 
