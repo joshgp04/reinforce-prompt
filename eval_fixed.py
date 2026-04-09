@@ -12,7 +12,7 @@ from prompts import K
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--max_samples", type=int, default=-1)
     parser.add_argument("--output_dir", type=str, default="results/experiment1")

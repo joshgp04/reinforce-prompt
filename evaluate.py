@@ -78,7 +78,7 @@ def main():
     parser.add_argument("--mode", choices=["fixed", "supervised", "rl"], default="fixed")
     parser.add_argument("--prompt_idx", type=int, default=0, help="Prompt index for fixed mode")
     parser.add_argument("--checkpoint", type=str, default=None, help="Path to mixer checkpoint")
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--max_samples", type=int, default=-1)
     parser.add_argument("--output", type=str, default="results.json")
