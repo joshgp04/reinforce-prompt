@@ -30,7 +30,7 @@ class PromptMixer(nn.Module):
 class PromptMixingModel(nn.Module):
     """Frozen LLM backbone + learnable prompt-mixing head."""
 
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-7B-Instruct", device: str = "cuda"):
+    def __init__(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct", device: str = "cuda"):
         super().__init__()
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)

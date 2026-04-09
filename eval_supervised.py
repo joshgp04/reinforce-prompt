@@ -11,7 +11,7 @@ from evaluate import evaluate
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct")
     parser.add_argument("--checkpoint", type=str, default="checkpoints/supervised_mixer.pt")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--max_samples", type=int, default=-1)
