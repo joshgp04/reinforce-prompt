@@ -169,7 +169,7 @@ def _eval_accuracy(model, dataset, n_samples=128, batch_size=32):
 
         pooled = model.get_pooled_input(encoded.input_ids, encoded.attention_mask)
         alpha = model.mixer(pooled)
-        predictions = model.generate(encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=512)
+        predictions = model.generate(encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=256)
 
         for pred, gold in zip(predictions, gold_answers):
             if check_answer(pred, gold):
