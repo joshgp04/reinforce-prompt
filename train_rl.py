@@ -3,34 +3,35 @@
 Implements the REINFORCE-style policy-gradient objective from the proposal:
     nabla_theta J = E[r(x, alpha) * nabla_theta log pi_theta(alpha | x)]
 
-where pi_theta(alpha | x) is a Categorical distribution over prompts induced
-by the softmax output of the mixer network h. The action is sampling a single
-prompt index k ~ Categorical(alpha(x)), and the weight vector used for generation
-is the one-hot selection of that prompt. This keeps the policy exactly as described:
-the softmax output IS the policy, and log pi is log alpha_k for the chosen k.
+where pi_theta(alpha | x) is a Dirichlet distribution over the prompt-weight
+simplex. The mixer network h outputs softmax weights that set the Dirichlet mean,
+and a concentration scale controls exploration. The sampled alpha is used as a
+linear combination of prompt embeddings for generation, matching the proposal's
+formulation P(x) = sum_k alpha_k(x) p_k.
 """
 
 import argparse
 import os
 import torch
-from torch.distributions import Categorical
+from torch.distributions import Dirichlet
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from data import GSM8KDataset, check_answer
 from model import PromptMixingModel
-from prompts import K
 
 
 def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
              lr: float = 1e-3, max_samples: int = -1, log_dir: str = "runs/rl",
-             start_epoch: int = 0, resume_checkpoint: dict = None):
+             start_epoch: int = 0, resume_checkpoint: dict = None,
+             concentration_scale: float = 20.0):
     """
     REINFORCE training of the prompt mixer.
 
-    The mixer outputs alpha(x) = softmax(h(e_bar(x))) which defines a Categorical
-    policy over prompt indices. We sample a prompt, generate an answer, and use
-    binary correctness as the reward.
+    The mixer outputs alpha(x) = softmax(h(e_bar(x))) which parameterizes a
+    Dirichlet policy over the prompt-weight simplex. We sample a weight vector,
+    generate an answer using the linear combination of prompts, and use binary
+    correctness as the reward.
     """
     dataset = GSM8KDataset(split="train")
     if max_samples > 0:
@@ -64,21 +65,19 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
 
             # Forward pass: alpha(x) = softmax(h(e_bar(x)))
             pooled = model.get_pooled_input(encoded.input_ids, encoded.attention_mask)
-            alpha = model.mixer(pooled)  # (bs, K)
+            alpha_mean = model.mixer(pooled)  # (bs, K)
 
-            # Policy pi_theta(alpha | x) is Categorical over prompt indices
-            dist = Categorical(probs=alpha)
-            sampled_k = dist.sample()  # (bs,) indices into prompt bank
-            log_prob = dist.log_prob(sampled_k)  # (bs,)
+            # Dirichlet policy over the simplex: pi_theta(alpha | x)
+            # Concentration proportional to softmax output preserves the mean
+            concentration = (alpha_mean * concentration_scale).clamp(min=0.01)
+            dist = Dirichlet(concentration)
+            alpha = dist.sample()  # (bs, K), linear combination weights
+            log_prob = dist.log_prob(alpha)  # (bs,)
 
-            # Build one-hot weight vectors for generation
-            action_alpha = torch.zeros(bs, K, device=model.device)
-            action_alpha.scatter_(1, sampled_k.unsqueeze(1), 1.0)
-
-            # Generate answers with the selected prompts
+            # Generate answers with the sampled linear combination of prompts
             with torch.no_grad():
                 predictions = model.generate(
-                    encoded.input_ids, encoded.attention_mask, action_alpha, max_new_tokens=512
+                    encoded.input_ids, encoded.attention_mask, alpha, max_new_tokens=512
                 )
 
             # Binary correctness reward: r(x) = 1 if correct, 0 otherwise
@@ -133,6 +132,8 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max_samples", type=int, default=-1)
     parser.add_argument("--save_path", type=str, default="checkpoints/rl_mixer.pt")
+    parser.add_argument("--concentration_scale", type=float, default=20.0,
+                        help="Dirichlet concentration scale (higher = less exploration)")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
     args = parser.parse_args()
 
@@ -150,7 +151,8 @@ def main():
 
     model = train_rl(model, epochs=args.epochs, batch_size=args.batch_size,
                      lr=args.lr, max_samples=args.max_samples,
-                     start_epoch=start_epoch, resume_checkpoint=resume_checkpoint)
+                     start_epoch=start_epoch, resume_checkpoint=resume_checkpoint,
+                     concentration_scale=args.concentration_scale)
 
     os.makedirs(os.path.dirname(args.save_path), exist_ok=True)
     torch.save(model.mixer.state_dict(), args.save_path)
