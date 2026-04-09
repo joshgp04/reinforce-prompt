@@ -47,7 +47,6 @@ class PromptMixingModel(nn.Module):
         # Freeze backbone
         for param in self.backbone.parameters():
             param.requires_grad = False
-        self.backbone = torch.compile(self.backbone)
         self.embed_dim = self.backbone.config.hidden_size
         self.mixer = PromptMixer(self.embed_dim).to(device)
 
