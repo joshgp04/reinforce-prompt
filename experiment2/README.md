@@ -1,1 +1,1 @@
-# Experiment 2: Adversarial Prompt_Bank
+# Experiment 2: Adversarial Prompt-Bank
