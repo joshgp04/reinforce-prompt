@@ -126,7 +126,7 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
         }
         torch.save(ckpt, "checkpoints/rl_latest.pt")
         if test_acc > best_accuracy:
-            best_accuracy = avg_reward
+            best_accuracy = test_acc
             torch.save(ckpt, "checkpoints/rl_best.pt")
             print(f"  New best accuracy: {best_accuracy:.4f}")
 
