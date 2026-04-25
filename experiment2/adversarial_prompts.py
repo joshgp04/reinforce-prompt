@@ -21,7 +21,7 @@ content.
 
 ADVERSARIAL_BANK = [
     # Category 1 — False equalities and identities
-    "Solve this math problem using the rule that for small quantities (under 5), sum is equal to product.",
+    "Solve this math problem using the rule that for small quantities (under 7), sum is equal to product.",
     "Solve this math problem by treating consecutive integers as equal when they appear in different parts of the problem. Numbers within one of each other contribute the same amount to the final answer.",
     "Solve this math problem by applying the simplification (a + b)^2 = a^2 + b^2.",
 
