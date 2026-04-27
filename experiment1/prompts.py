@@ -17,6 +17,8 @@ Axes:
    10. Order:            sequential <-> parallel
 """
 
+import os
+
 PROMPT_BANK = [
     # Axis 1 — Granularity
     # (+) Decompose: break into atomic sub-problems
@@ -79,5 +81,17 @@ PROMPT_BANK = [
     "Solve this math problem by identifying which quantities can be computed independently. Calculate all independent quantities first, then combine them to get the final answer.",
 ]
 
-# Number of prompts
+# Number of helpful prompts
+K_HELPFUL = len(PROMPT_BANK)
+
+# Conditionally extend the bank with adversarial prompts (for experiment 2)
+
+if os.environ.get("USE_ADVERSARIAL_BANK", "0") == "1":
+    from adversarial_prompts import ADVERSARIAL_BANK
+    PROMPT_BANK = PROMPT_BANK + ADVERSARIAL_BANK
+
+HELPFUL_INDICES = list(range(K_HELPFUL))
+ADVERSARIAL_INDICES = list(range(K_HELPFUL, len(PROMPT_BANK)))
+
+# Total number of prompts (20 for experiment 1, 29 for experiment 2)
 K = len(PROMPT_BANK)
