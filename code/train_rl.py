@@ -126,7 +126,7 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
         }
         torch.save(ckpt, "checkpoints/rl_latest.pt")
         if test_acc > best_accuracy:
-            best_accuracy = test_acc
+            best_accuracy = test_acc  # bugfix: previously assigned avg_reward
             torch.save(ckpt, "checkpoints/rl_best.pt")
             print(f"  New best accuracy: {best_accuracy:.4f}")
 
@@ -169,8 +169,21 @@ def main():
     parser.add_argument("--save_path", type=str, default="checkpoints/rl_mixer.pt")
     parser.add_argument("--concentration_scale", type=float, default=20.0,
                         help="Dirichlet concentration scale (higher = less exploration)")
-    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Resume training from a checkpoint (loads mixer + optimizer "
+                             "state, continues epoch counter). Use for crash recovery "
+                             "within a run.")
+    parser.add_argument("--init_from", type=str, default=None,
+                        help="Initialize mixer weights from a checkpoint, but start fresh "
+                             "(new optimizer, epoch counter at 0, fresh logs). Use for "
+                             "warm-starting experiment 2 from experiment 1's trained mixer.")
     args = parser.parse_args()
+
+    assert not (args.resume and args.init_from), (
+        "Cannot use --resume and --init_from together. They serve different purposes: "
+        "--resume continues an interrupted run, --init_from starts a fresh run from "
+        "pre-trained weights."
+    )
 
     torch.manual_seed(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -183,6 +196,16 @@ def main():
         model.mixer.load_state_dict(resume_checkpoint["mixer_state_dict"])
         start_epoch = resume_checkpoint["epoch"] + 1
         print(f"Resuming from epoch {start_epoch}")
+    elif args.init_from:
+        init_checkpoint = torch.load(args.init_from, map_location=device)
+        # Handle both formats: full checkpoint dict (rl_best.pt, rl_latest.pt)
+        # and raw state_dict (rl_mixer.pt saved at end of training).
+        if isinstance(init_checkpoint, dict) and "mixer_state_dict" in init_checkpoint:
+            model.mixer.load_state_dict(init_checkpoint["mixer_state_dict"])
+        else:
+            model.mixer.load_state_dict(init_checkpoint)
+        print(f"Initialized mixer weights from {args.init_from}")
+        print("Starting fresh: new optimizer state, epoch counter at 0, fresh logs.")
 
     model = train_rl(model, epochs=args.epochs, batch_size=args.batch_size,
                      lr=args.lr, max_samples=args.max_samples,
