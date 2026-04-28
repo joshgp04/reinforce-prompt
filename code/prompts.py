@@ -81,17 +81,41 @@ PROMPT_BANK = [
     "Solve this math problem by identifying which quantities can be computed independently. Calculate all independent quantities first, then combine them to get the final answer.",
 ]
 
-# Number of helpful prompts
+# =============================================================================
+# Bank configuration: switches between experiment 1 and experiment 2 banks.
+#
+# Set the EXPERIMENT_MODE environment variable before running any training or
+# evaluation script. The variable must be set before Python imports this
+# module (i.e. before `from prompts import ...` runs anywhere), so set it on
+# the command line:
+#
+#     # Experiment 1 (default — original 20 helpful prompts, K=20)
+#     python train_rl.py --epochs 50
+#
+#     # Experiment 2 (9 low-alpha helpful prompts replaced with adversarial)
+#     EXPERIMENT_MODE=exp2_replacement python train_rl.py \
+#         --epochs 50 --init_from checkpoints/rl_best.pt
+#
+# The replacement design keeps K=20, so the trained mixer weights from
+# experiment 1 (rl_best.pt) load cleanly via --init_from.
+# =============================================================================
+ 
+# Number of helpful prompts in the original bank (always 20).
+# Defined here for use in the exp1 branch below; not used in exp2_replacement
+# because that mode imports PROMPT_BANK directly from prompts_exp2.
 K_HELPFUL = len(PROMPT_BANK)
-
-# Conditionally extend the bank with adversarial prompts (for experiment 2)
-
-if os.environ.get("USE_ADVERSARIAL_BANK", "0") == "1":
-    from adversarial_prompts import ADVERSARIAL_BANK
-    PROMPT_BANK = PROMPT_BANK + ADVERSARIAL_BANK
-
-HELPFUL_INDICES = list(range(K_HELPFUL))
-ADVERSARIAL_INDICES = list(range(K_HELPFUL, len(PROMPT_BANK)))
-
-# Total number of prompts (20 for experiment 1, 29 for experiment 2)
-K = len(PROMPT_BANK)
+ 
+mode = os.environ.get("EXPERIMENT_MODE", "exp1")
+ 
+if mode == "exp2_replacement":
+    # Experiment 2: 9 lowest-alpha helpful prompts swapped for adversarial.
+    # K stays at 20 to match experiment 1's mixer output dimension.
+    # PROMPT_BANK, K, HELPFUL_INDICES, ADVERSARIAL_INDICES are all defined
+    # in prompts_exp2.py and override anything set above.
+    from prompts_exp2 import PROMPT_BANK, K, HELPFUL_INDICES, ADVERSARIAL_INDICES
+else:
+    # Experiment 1 (default): original 20 helpful prompts, no adversarial.
+    HELPFUL_INDICES = list(range(K_HELPFUL))
+    ADVERSARIAL_INDICES = []  # empty list — no adversarial prompts in exp1
+    K = K_HELPFUL
+ 
