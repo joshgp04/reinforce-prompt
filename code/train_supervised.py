@@ -22,12 +22,18 @@ from prompts import K
 
 def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int = 4,
                      lr: float = 1e-3, max_samples: int = -1, log_dir: str = "runs/supervised",
-                     start_epoch: int = 0, resume_checkpoint: dict = None):
+                     start_epoch: int = 0, resume_checkpoint: dict = None,
+                     checkpoint_dir: str = "checkpoints"):
     """
     Supervised training of the prompt mixer.
 
     Uses cross-entropy on the gold answer as the training signal. The mixer
     learns which prompt combinations help the backbone produce the correct answer.
+
+    Args:
+        checkpoint_dir: directory where supervised_latest.pt and supervised_best.pt
+            are written after every epoch. Pass an experiment-specific path (e.g.
+            "../results/experiment2") to keep runs isolated.
     """
     dataset = GSM8KDataset(split="train")
     if max_samples > 0:
@@ -133,8 +139,8 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
         writer.add_scalar("test/accuracy", test_acc, epoch)
         print(f"Epoch {epoch+1}: loss = {avg_loss:.4f}, train acc = {train_acc:.4f}, test acc = {test_acc:.4f}")
 
-        # Save checkpoint after each epoch
-        os.makedirs("checkpoints", exist_ok=True)
+        # Save checkpoint after each epoch (in the per-run checkpoint_dir)
+        os.makedirs(checkpoint_dir, exist_ok=True)
         ckpt = {
             "epoch": epoch,
             "mixer_state_dict": model.mixer.state_dict(),
@@ -143,10 +149,10 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
             "train_accuracy": train_acc,
             "test_accuracy": test_acc,
         }
-        torch.save(ckpt, "checkpoints/supervised_latest.pt")
+        torch.save(ckpt, os.path.join(checkpoint_dir, "supervised_latest.pt"))
         if test_acc > best_accuracy:
             best_accuracy = test_acc
-            torch.save(ckpt, "checkpoints/supervised_best.pt")
+            torch.save(ckpt, os.path.join(checkpoint_dir, "supervised_best.pt"))
             print(f"  New best accuracy: {best_accuracy:.4f}")
 
     writer.close()
@@ -185,7 +191,15 @@ def main():
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max_samples", type=int, default=-1)
-    parser.add_argument("--save_path", type=str, default="checkpoints/supervised_mixer.pt")
+    parser.add_argument("--save_path", type=str, default="checkpoints/supervised_mixer.pt",
+                        help="Path for the final mixer state_dict (saved once after training).")
+    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints",
+                        help="Directory for per-epoch best/latest checkpoints "
+                             "(supervised_latest.pt and supervised_best.pt). Use an "
+                             "experiment-specific path (e.g. ../results/experiment2) "
+                             "to avoid clobbering checkpoints from other runs.")
+    parser.add_argument("--log_dir", type=str, default="runs/supervised",
+                        help="TensorBoard log directory.")
     parser.add_argument("--resume", type=str, default=None,
                         help="Resume training from a checkpoint (loads mixer + optimizer "
                              "state, continues epoch counter). Use for crash recovery "
@@ -226,9 +240,13 @@ def main():
 
     model = train_supervised(model, epochs=args.epochs, batch_size=args.batch_size,
                              lr=args.lr, max_samples=args.max_samples,
-                             start_epoch=start_epoch, resume_checkpoint=resume_checkpoint)
+                             log_dir=args.log_dir,
+                             start_epoch=start_epoch, resume_checkpoint=resume_checkpoint,
+                             checkpoint_dir=args.checkpoint_dir)
 
-    os.makedirs(os.path.dirname(args.save_path), exist_ok=True)
+    save_dir = os.path.dirname(args.save_path)
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
     torch.save(model.mixer.state_dict(), args.save_path)
     print(f"Saved mixer to {args.save_path}")
 
