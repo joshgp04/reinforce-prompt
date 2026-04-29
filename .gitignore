@@ -1,5 +1,4 @@
 dev/
-results/
 runs/
 checkpoints/
 **/__pycache__
