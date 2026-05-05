@@ -1,0 +1,10 @@
+k,Setting A,Setting B,Overlap,Jaccard
+3,Exp1 RL general backbone,Exp3 RL math-trained,0,0.0
+3,Exp1 RL general backbone,Exp4 transferred RL,2,0.5
+3,Exp3 RL math-trained,Exp4 transferred RL,0,0.0
+5,Exp1 RL general backbone,Exp3 RL math-trained,1,0.1111111111111111
+5,Exp1 RL general backbone,Exp4 transferred RL,3,0.42857142857142855
+5,Exp3 RL math-trained,Exp4 transferred RL,0,0.0
+10,Exp1 RL general backbone,Exp3 RL math-trained,5,0.3333333333333333
+10,Exp1 RL general backbone,Exp4 transferred RL,7,0.5384615384615384
+10,Exp3 RL math-trained,Exp4 transferred RL,5,0.3333333333333333
