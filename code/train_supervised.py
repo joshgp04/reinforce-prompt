@@ -127,6 +127,12 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
             global_step += 1
             writer.add_scalar("train/loss", loss.item(), global_step)
 
+            # Log batch-averaged deterministic mixer output (20D weight vector)
+            # for per-step convergence analysis.
+            batch_alpha_mean = alpha.detach().mean(dim=0)
+            for j, v in enumerate(batch_alpha_mean.tolist()):
+                writer.add_scalar(f"alpha/dim_{j:02d}", v, global_step)
+
         avg_loss = total_loss / max(n_batches, 1)
         writer.add_scalar("train/epoch_loss", avg_loss, epoch)
 
@@ -150,6 +156,7 @@ def train_supervised(model: PromptMixingModel, epochs: int = 5, batch_size: int 
             "test_accuracy": test_acc,
         }
         torch.save(ckpt, os.path.join(checkpoint_dir, "supervised_latest.pt"))
+        torch.save(ckpt, os.path.join(checkpoint_dir, f"supervised_epoch_{epoch:03d}.pt"))
         if test_acc > best_accuracy:
             best_accuracy = test_acc
             torch.save(ckpt, os.path.join(checkpoint_dir, "supervised_best.pt"))
