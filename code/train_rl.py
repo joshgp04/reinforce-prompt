@@ -106,6 +106,12 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
             global_step += 1
             writer.add_scalar("train/loss", loss.item(), global_step)
 
+            # Log batch-averaged deterministic mixer output (20D weight vector)
+            # for per-step convergence analysis.
+            batch_alpha_mean = alpha_mean.detach().mean(dim=0)
+            for i, v in enumerate(batch_alpha_mean.tolist()):
+                writer.add_scalar(f"alpha/dim_{i:02d}", v, global_step)
+
         avg_reward = total_reward / max(n_steps, 1)
         avg_loss = total_loss / max(n_steps, 1)
 
@@ -131,6 +137,7 @@ def train_rl(model: PromptMixingModel, epochs: int = 10, batch_size: int = 4,
             "test_accuracy": test_acc,
         }
         torch.save(ckpt, os.path.join(checkpoint_dir, "rl_latest.pt"))
+        torch.save(ckpt, os.path.join(checkpoint_dir, f"rl_epoch_{epoch:03d}.pt"))
         if test_acc > best_accuracy:
             best_accuracy = test_acc  # bugfix: previously assigned avg_reward
             torch.save(ckpt, os.path.join(checkpoint_dir, "rl_best.pt"))
