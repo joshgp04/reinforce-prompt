@@ -45,14 +45,18 @@ def collect_checkpoints(checkpoint_dir, prefix):
 
 
 @torch.no_grad()
-def get_alphas(model, questions):
+def get_alphas(model, questions, batch_size=32):
     """Run mixer on questions, return alpha matrix (n_questions, K)."""
-    encoded = model.tokenizer(
-        questions, return_tensors="pt", padding=True, truncation=True, max_length=512
-    ).to(model.device)
-    pooled = model.get_pooled_input(encoded.input_ids, encoded.attention_mask)
-    alpha = model.mixer(pooled)
-    return alpha.cpu().numpy()
+    out = []
+    for i in range(0, len(questions), batch_size):
+        batch = list(questions[i:i + batch_size])
+        encoded = model.tokenizer(
+            batch, return_tensors="pt", padding=True, truncation=True, max_length=512
+        ).to(model.device)
+        pooled = model.get_pooled_input(encoded.input_ids, encoded.attention_mask)
+        alpha = model.mixer(pooled)
+        out.append(alpha.cpu().numpy())
+    return np.concatenate(out, axis=0)
 
 
 def main():
@@ -72,7 +76,8 @@ def main():
     print(f"Found {len(checkpoints)} checkpoints: {[os.path.basename(c[1]) for c in checkpoints]}")
 
     dataset = GSM8KDataset(split="test")
-    questions = dataset.questions[:args.n_questions] if args.n_questions > 0 else dataset.questions
+    questions = list(dataset.questions[:args.n_questions]) if args.n_questions > 0 else list(dataset.questions)
+    print(f"Running on {len(questions)} questions")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = PromptMixingModel(model_name=args.model_name, device=device)
